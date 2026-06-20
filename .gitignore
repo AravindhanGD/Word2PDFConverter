@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.vscode/
+.idea/
+
+# Temporary files
+input_*.docx
+output_*.pdf
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
