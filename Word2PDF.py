@@ -5,10 +5,11 @@ import uuid
 import time
 import re
 import subprocess
+import shutil
 
 app = Flask(__name__)
 
-# HTML template
+# [HTML TEMPLATE - SAME AS BEFORE]
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -113,44 +114,25 @@ HTML_TEMPLATE = """
 def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
-def convert_docx_to_pdf(input_path, output_path):
-    """Convert Word to PDF - works on Windows (Word) and Linux (LibreOffice)"""
+def find_libreoffice():
+    """Find LibreOffice executable"""
+    # Try common names
+    possible_cmds = ['libreoffice', 'soffice']
+    for cmd in possible_cmds:
+        path = shutil.which(cmd)
+        if path:
+            return path
+    return None
+
+def convert_with_libreoffice(input_path, output_path):
+    """Convert using LibreOffice"""
+    soffice_cmd = find_libreoffice()
+    print(f"🔍 LibreOffice found at: {soffice_cmd}")
     
-    # Try docx2pdf first (Windows only)
-    if sys.platform == 'win32':
-        try:
-            # Import docx2pdf ONLY on Windows
-            from docx2pdf import convert
-            print("🔄 Using docx2pdf (Microsoft Word)...")
-            convert(input_path, output_path)
-            return True
-        except ImportError:
-            print("⚠️ docx2pdf not installed on Windows")
-        except Exception as e:
-            print(f"⚠️ docx2pdf failed: {e}")
+    if not soffice_cmd:
+        return False
     
-    # Fallback to LibreOffice (Linux/Windows)
     try:
-        print("🔄 Using LibreOffice...")
-        
-        # Find LibreOffice executable
-        if sys.platform == 'win32':
-            # Windows LibreOffice paths
-            soffice_paths = [
-                r'C:\Program Files\LibreOffice\program\soffice.exe',
-                r'C:\Program Files (x86)\LibreOffice\program\soffice.exe',
-            ]
-            soffice_cmd = None
-            for path in soffice_paths:
-                if os.path.exists(path):
-                    soffice_cmd = path
-                    break
-            if not soffice_cmd:
-                raise Exception("LibreOffice not found on Windows. Please install LibreOffice.")
-        else:
-            # Linux/Mac - assume it's in PATH
-            soffice_cmd = 'libreoffice'
-        
         # Run conversion
         result = subprocess.run([
             soffice_cmd,
@@ -171,13 +153,10 @@ def convert_docx_to_pdf(input_path, output_path):
                 os.rename(expected_pdf, output_path)
             return True
         
-        raise Exception("PDF not created by LibreOffice")
-        
-    except subprocess.TimeoutExpired:
-        print("❌ LibreOffice conversion timed out")
         return False
+        
     except Exception as e:
-        print(f"❌ LibreOffice failed: {e}")
+        print(f"❌ LibreOffice error: {e}")
         return False
 
 @app.route('/')
@@ -214,11 +193,11 @@ def convert_word_to_pdf():
         file.save(input_path)
         print(f"📁 File saved: {input_path}")
         
-        # Convert
-        success = convert_docx_to_pdf(input_path, output_path)
+        # Convert using LibreOffice
+        success = convert_with_libreoffice(input_path, output_path)
         
         if not success:
-            return 'Conversion failed. Please ensure Microsoft Word or LibreOffice is installed.', 500
+            return 'Conversion failed. LibreOffice is not available.', 500
         
         if not os.path.exists(output_path):
             return 'Conversion failed - PDF not created', 500
@@ -241,11 +220,9 @@ def convert_word_to_pdf():
             try:
                 if os.path.exists(input_path):
                     os.remove(input_path)
-                    print(f"🧹 Cleaned up: {input_path}")
                 if os.path.exists(output_path):
                     time.sleep(0.5)
                     os.remove(output_path)
-                    print(f"🧹 Cleaned up: {output_path}")
             except Exception as e:
                 print(f"⚠️ Cleanup error: {e}")
         
@@ -263,12 +240,14 @@ if __name__ == '__main__':
     print("🚀 Word to PDF Converter - Starting...")
     print("=" * 60)
     print(f"📱 Server running on port: {port}")
-    print("📄 Upload any .docx file and it will be converted to PDF")
-    print(f"💻 Platform: {sys.platform}")
-    if sys.platform == 'win32':
-        print("✅ Using Microsoft Word for conversion")
+    
+    # Check for LibreOffice
+    libreoffice = find_libreoffice()
+    if libreoffice:
+        print(f"✅ LibreOffice found at: {libreoffice}")
     else:
-        print("✅ Using LibreOffice for conversion")
+        print("⚠️ LibreOffice not found! Please ensure it's installed.")
+    
     print("⏹️  Press CTRL+C to stop the server")
     print("=" * 60)
     app.run(host='0.0.0.0', port=port, debug=True)
