@@ -7,13 +7,15 @@ import re
 
 app = Flask(__name__)
 
-# HTML template for the webpage
+# HTML template
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
     <title>Word to PDF Converter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        * { box-sizing: border-box; }
         body {
             font-family: Arial, sans-serif;
             max-width: 600px;
@@ -30,7 +32,12 @@ HTML_TEMPLATE = """
         }
         h1 {
             color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
             margin-bottom: 30px;
+            font-size: 14px;
         }
         .upload-area {
             border: 2px dashed #4CAF50;
@@ -45,6 +52,7 @@ HTML_TEMPLATE = """
             display: block;
             margin-left: auto;
             margin-right: auto;
+            max-width: 100%;
         }
         .btn {
             background: #4CAF50;
@@ -87,12 +95,30 @@ HTML_TEMPLATE = """
             color: #666;
             font-size: 14px;
         }
+        .features {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            font-size: 13px;
+            color: #666;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 12px;
+            color: #999;
+        }
+        @media (max-width: 480px) {
+            .container { padding: 20px; }
+            .upload-area { padding: 20px; }
+            h1 { font-size: 24px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📄 Word to PDF Converter</h1>
-        <p>Upload a .docx file and convert it to PDF instantly!</p>
+        <p class="subtitle">Upload a .docx file and convert it to PDF instantly!</p>
         
         <div class="upload-area">
             <form id="uploadForm" action="/convert" method="POST" enctype="multipart/form-data">
@@ -104,10 +130,16 @@ HTML_TEMPLATE = """
         </div>
         
         <div id="status">Ready to convert...</div>
+        
+        <div class="features">
+            ✅ Converts Word documents to PDF<br>
+            ✅ Preserves formatting<br>
+            ✅ Works on any device (mobile, desktop)
+        </div>
+        <div class="footer">Made with ❤️ • Free & Open Source</div>
     </div>
 
     <script>
-        // Show selected filename
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const fileName = e.target.files[0] ? e.target.files[0].name : 'No file selected';
             document.getElementById('fileName').textContent = '📎 Selected: ' + fileName;
@@ -115,7 +147,6 @@ HTML_TEMPLATE = """
             document.getElementById('status').className = '';
         });
 
-        // Handle form submission
         document.getElementById('uploadForm').onsubmit = async function(e) {
             e.preventDefault();
             
@@ -123,7 +154,6 @@ HTML_TEMPLATE = """
             const status = document.getElementById('status');
             const submitBtn = document.getElementById('submitBtn');
             
-            // Check if file is selected
             const fileInput = document.getElementById('fileInput');
             if (!fileInput.files || fileInput.files.length === 0) {
                 status.innerHTML = '❌ Please select a file first!';
@@ -142,7 +172,6 @@ HTML_TEMPLATE = """
                 });
                 
                 if (response.ok) {
-                    // Get the filename from the response headers
                     const contentDisposition = response.headers.get('Content-Disposition');
                     let filename = 'converted.pdf';
                     if (contentDisposition) {
@@ -152,7 +181,6 @@ HTML_TEMPLATE = """
                         }
                     }
                     
-                    // Download the PDF
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -193,7 +221,6 @@ def index():
 
 @app.route('/convert', methods=['GET', 'POST'])
 def convert_word_to_pdf():
-    # If someone visits /convert directly with GET, redirect to home
     if request.method == 'GET':
         return "Please use the form at the homepage to upload a file. <a href='/'>Go back</a>", 405
     
@@ -201,7 +228,6 @@ def convert_word_to_pdf():
     output_path = None
     
     try:
-        # Check if file was uploaded
         if 'file' not in request.files:
             return 'No file uploaded. Please select a .docx file.', 400
         
@@ -213,7 +239,7 @@ def convert_word_to_pdf():
         if not file.filename.lower().endswith('.docx'):
             return 'Only .docx files are supported. Please upload a Word document.', 400
         
-        # Get the original filename without extension
+        # Get the original filename
         original_filename = file.filename
         name_without_extension = os.path.splitext(original_filename)[0]
         safe_name = sanitize_filename(name_without_extension)
@@ -236,8 +262,8 @@ def convert_word_to_pdf():
         convert(input_path, output_path)
         print(f"✅ PDF created at: {output_path}")
         
-        # Wait for the file to be fully written
-        time.sleep(1.5)
+        # Wait for the file to be fully released
+        time.sleep(1)
         
         # Check if PDF was created successfully
         if not os.path.exists(output_path):
@@ -276,7 +302,8 @@ def convert_word_to_pdf():
                 
     except Exception as e:
         print(f"❌ Error during conversion: {str(e)}")
-        # Clean up if error occurs
+        import traceback
+        traceback.print_exc()
         try:
             if input_path and os.path.exists(input_path):
                 os.remove(input_path)
@@ -291,8 +318,6 @@ def convert_word_to_pdf():
         return f"Conversion error: {str(e)}", 500
 
 if __name__ == '__main__':
-    # Get the port from environment variable (Render sets this automatically)
-    # If not set, default to 5000 for local testing
     port = int(os.environ.get('PORT', 5000))
     
     print("=" * 60)
@@ -300,8 +325,8 @@ if __name__ == '__main__':
     print("=" * 60)
     print(f"📱 Server running on port: {port}")
     print("📄 Upload any .docx file and it will be converted to PDF")
+    print("✅ Uses Microsoft Word for perfect formatting!")
     print("⏹️  Press CTRL+C to stop the server")
     print("=" * 60)
     
-    # host='0.0.0.0' makes it accessible from anywhere (needed for cloud)
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True)
